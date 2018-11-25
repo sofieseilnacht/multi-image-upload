@@ -1,24 +1,24 @@
 import json
-import base64
-# import urllib.request
-import requests3
-import sys
+import configparser
+import urllib.request
+import requests
 
-def getUrl(url):
+
+def myLogin(url, apikey):
     try:
-        with urllib.request.urlopen(url) as response:
-            html=response.read()
-    except urllib.error.URLError as e:
+        R = requests.post(url, data={'request-json': json.dumps({"apikey": apikey})})
+        print(R.text)
+    except requests.exceptions.RequestException as e:
         print(e.reason)
-        raise
-    return html
+        raise(e)
 
-def myLogin(url):
-    R = requests.post('http://nova.astrometry.net/api/login', data={'request-json': json.dumps({"apikey": "xuwbkwswjjickoit"})})
-    print(R.text)
     return R
 
 
-myUrl = "https://google.com"
-myHtml = myLogin(myUrl)
+config = configparser.ConfigParser()
+config.read('myconfig.ini')
+apikey = config['nova.astrometrics.net']['apikey']
+login_url = config['nova.astrometrics.net']['login_url']
+
+myHtml = myLogin(login_url, apikey)
 print(myHtml)
