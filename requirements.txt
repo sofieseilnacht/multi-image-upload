@@ -1,1 +1,3 @@
 requests==2.20.1
+boto3==1.9.67
+botocore==1.12.67
