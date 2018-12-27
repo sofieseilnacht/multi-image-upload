@@ -223,9 +223,10 @@ for file in files:
     submission = submitAstrometryUrl(file)
     (head, tail) = os.path.split(file)
 
-    if (submission['status'] == 'success') :
-        status = waitOnAstrometrySubmissionDone(submission['subid'])
-        createLog(tail, status, s3)
+    if ('status' in submission) :
+        if (submission['status'] == 'success') :
+            status = waitOnAstrometrySubmissionDone(submission['subid'])
+            createLog(tail, status, s3)
         if (archive_flag) :
             archiveImage(tail, s3_imagebucket, s3)
     else :
