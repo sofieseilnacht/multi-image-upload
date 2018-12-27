@@ -1,13 +1,10 @@
-import json
 import configparser
-from typing import Dict, Any, Union
-
 import requests
-import io
 import os
 import boto3
 import botocore
 import json
+import time
 
 #log in to astrometry and return a session
 def astrometryLogin(url, apikey):
@@ -23,25 +20,15 @@ def astrometryLogin(url, apikey):
 
     return None
 
-#place holder to upload files to astrometry
-def AstrometryFileUploadRequest(filename, url, session):
-    request = {}
-    with open(filename, mode = "rb") as file:
-        filecontent = file.read()
-    ### read section on POST a Multipart-Encoded File
-    ### http://docs.python-requests.org/en/master/user/quickstart/
-
-    # will need to find the docs for this API or reverse engineer the web app
-    # sample code - https://github.com/dstndstn/astrometry.net/blob/master/net/client/client.py
-
-    return request
 
 #Gives a list of image files in s3 Bucket
 def listS3Files(client, bucketName, prefix):
-    #"""List files in specific S3 URL"""
+    #List files in specific S3 URL
     response = client.list_objects(Bucket=bucketName, Prefix=prefix)
     for content in response.get('Contents', []):
-      yield content.get('Key')
+      key = content.get('Key')
+      if key.endswith( ('.jpg', '.jpeg', '.png', '.gif') ):
+          yield key
 
 #gives list of files on local dir
 def listFiles(path):
@@ -54,22 +41,75 @@ def listFiles(path):
     filenames.sort() # now you have the filenames and can do something with them
     return filenames
 
-def createAstrometryImageUploadRequest(file, url, session):
-    binary_stream = io.BytesIO()
-    # Read all data from the buffer
-    stream_data = binary_stream.read()
 
-    request = {}
-    #trying to figure out how to encode the file correctly to post to site
-    ### read section on POST a Multipart-Encoded File
-    ### http://docs.python-requests.org/en/master/user/quickstart/
+def submitAstrometryUrl(file):
+    imageUrl = s3_bucket_url+'/'+file
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    settings = newAstromertyUploadSettings(imageUrl, loginSession)
 
-    # will need to find the docs for this API or reverse engineer the web app
-    # sample code - https://github.com/dstndstn/astrometry.net/blob/master/net/client/client.py
+    try:
+        response = requests.post(upload_url, headers=headers, data={'request-json': json.dumps(settings)})
 
+        if (response.status_code == 200) :
+            body = response.json()
+
+        else:
+            print("request failed: "+imageUrl+", statuscode: "+str(response.status_code))
+            body = {"url" : imageUrl, "status" : "http error", "error_code" : str(response.status_code)}
+
+    except botocore.exceptions.ClientError as e:
+        body = {"url" : imageUrl, "status" : "client error", "error_code" : str(e.response['Error']['Code'])}
+
+    return body
+
+def getAstrometryCalibrationResults(jobs) :
+    # TODO - iterate jobs and create a results array
+    return 'TODO'
+
+def waitOnAstrometrySubmissionDone(submissionId):
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    url = submit_status_url+str(submissionId)
+    response = requests.get(url, headers=headers)
+
+
+    while (response.status_code == 200) :
+        body = response.json()
+        processing_finished = body['processing_finished']
+
+        # loop until a processing finished timestamp is in the response
+        if (processing_finished != 'None') :
+            body['job_calibrations'] = getAstrometryCalibrationResults(body['job_calibrations'])
+            break
+
+        time.sleep(15)
+        response = requests.get(url, headers=headers)
+
+    if (response.status_code != 200) :
+        print("request failed: "+url+", statuscode: "+str(response.status_code))
+        body = {"url" : url, "status" : "http error", "error_code" : str(response.status_code)}
+
+    return body
+
+def archiveImage(file, bucket, s3):
+    copyResponse = s3.meta.client.copy_object(
+        ACL='public-read',
+        Bucket=bucket,
+        CopySource={'Bucket': bucket, 'Key': "pending/"+file},
+        Key="archive/"+file
+    )
+    if (copyResponse['ResponseMetadata']['HTTPStatusCode'] == 200) :
+        deleteResponse = s3.meta.client.delete_object(Bucket=bucket, Key="pending/"+file)
+
+def createLog(name, data, s3):
+    logObject = s3.Object(s3_imagebucket, 'logs/'+name+".json")
+    logObject.put(Body=json.dumps(data))
+
+def createErrorLog(name, data, s3):
+    logObject = s3.Object(s3_imagebucket, 'errors/'+name+".json")
+    logObject.put(Body=json.dumps(data))
 
 #won't work for JB image because have to split pics between invert and regular
-def getAstromertyUploadSettings(url, session):
+def newAstromertyUploadSettings(url, session):
     settings = {}
 
     # session: string, requried. Your session key, required in all requests
@@ -105,20 +145,20 @@ def getAstromertyUploadSettings(url, session):
     settings['scale_upper'] = '180.0'
 
     # scale_est: float. The estimated scale of the image.
-    settings['scale_est'] = ''
+    ##settings['scale_est'] = ''
 
     # scale_err: float, 0 to 100. The error (percentage) on the estimated scale of the image.
-    settings['scale_err'] = ''
+    ##settings['scale_err'] = ''
 
     # center_ra: float, 0 to 360, in degrees. The position of the center of the image.
-    settings['center_ra'] = ''
+    ##settings['center_ra'] = ''
 
     # center_dec: float, -90 to 90, in degrees. The position of the center of the image.
-    settings['center_dec'] = ''
+    ##settings['center_dec'] = ''
 
     # radius: float, in degrees. Used with center_ra,‘‘center_dec‘‘ to specify that you know roughly where
     # your image is on the sky.
-    settings['radius'] = ''
+    ##settings['radius'] = ''
 
     # downsample_factor: float, >1. Downsample (bin) your image by this factor before performing source
     # detection. This often helps with saturated images, noisy images, and large images. 2 and 4 are commonlyuseful
@@ -130,7 +170,7 @@ def getAstromertyUploadSettings(url, session):
     settings['tweak_order'] = '2'
 
     # use_sextractor: boolean. Use the SourceExtractor program to detect stars, not our built-in program
-    settings['use_sextractor'] = ''
+    ##settings['use_sextractor'] = ''
 
     # crpix_center: boolean. Set the WCS reference position to be the center pixel in the image? By default the
     # center is the center of the quadrangle of stars used to identify the image.
@@ -142,10 +182,10 @@ def getAstromertyUploadSettings(url, session):
     settings['parity'] = '2'
 
     # image_width: int, only necessary if you are submitting an “x,y list” of source positions.
-    settings['image_width'] = ''
+    ##settings['image_width'] = ''
 
     # image_height: int, only necessary if you are submitting an “x,y list” of source positions.
-    settings['image_height'] = ''
+    ##settings['image_height'] = ''
 
     # positional_error: float, expected error on the positions of stars in your image. Default is 1.
     settings['positional_error'] = 1
@@ -161,85 +201,32 @@ login_path = config['nova.astrometry.net']['login_path']
 url_upload_path = config['nova.astrometry.net']['url_upload_path']
 login_url = base_url+login_path
 upload_url = base_url+url_upload_path
+submit_status_url = base_url+"/api/submissions/"
 image_dir= config['nova.astrometry.net']['image_dir']
 s3_imagebucket = config['nova.astrometry.net']['s3_bucket']
 s3_bucket_url = config['nova.astrometry.net']['s3_bucket_url']
+archive_flag = config['nova.astrometry.net']['archive_flag']
 
 # return file generator over S3 bucket
 client = boto3.client('s3')
-files = listS3Files(client, s3_imagebucket, '')
+files = listS3Files(client, s3_imagebucket, 'pending/')
 
 # login
 loginSession = astrometryLogin(login_url, apikey)
-
-
-def pretty_print_POST(req):
-    """
-    At this point it is completely built and ready
-    to be fired; it is "prepared".
-
-    However pay attention at the formatting used in
-    this function because it is programmed to be pretty
-    printed and may differ from the actual request.
-    """
-    print('{}\n{}\n{}\n\n{}'.format(
-        '-----------START-----------',
-        req.method + ' ' + req.url,
-        '\n'.join('{}: {}'.format(k, v) for k, v in req.headers.items()),
-        req.body,
-        ))
 
 
 # iterate file generator
 s3 = boto3.resource('s3')
 for file in files:
 
-    # put into a function that returns a subid
-    try:
-        s3.Bucket(s3_imagebucket).download_file(file, os.path.join(image_dir, os.path.basename(file)))
-        imageUrl = s3_bucket_url+'/'+file
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        settings = getAstromertyUploadSettings(imageUrl, loginSession)
-        #settingsJson = json.dumps(settings)
-        #req = requests.Request('POST',upload_url, headers=headers, json=settings)
-        #prepared = req.prepare()
-        #pretty_print_POST(req)
+    # initial file meta data as part of log data (where from, who from, original url, ...)
+    submission = submitAstrometryUrl(file)
+    (head, tail) = os.path.split(file)
 
-        payload={'request-json': settings}
-        response = requests.post(upload_url, headers=headers, data=payload)
-
-
-        if (response.status_code == 200 or response.status_code == 302) :
-            uploadResponse = response.json()
-
-            #check the response status
-            body = json.load(response.text)
-            status = body['status']
-
-            if (status == 'success') :
-                subid = body['subid']
-
-            else :
-                print("request failed: "+imageUrl+", statuscode: "+status)
-        else:
-            print("request failed: "+imageUrl+", statuscode: "+str(response.status_code))
-
-    except botocore.exceptions.ClientError as e:
-        if e.response['Error']['Code'] == "404":
-            print("The object does not exist.")
-        else:
-            raise
-
-    # rite a function that takes a subid and gets submission status (GET)
-    # sleep for 30 secs and and loop until all jobs are done (GET)
-
-#    request = createAstrometryImageUploadRequest(filename, upload_url,loginSession)
-
-
-# files = listFiles(image_dir)
-# for filename in files:
-#     # create request
-#     print("filename: "+filename)
-#     request = createAstrometryImageUploadRequest(file,upload_url,loginSession)
-
-print(loginSession)
+    if (submission['status'] == 'success') :
+        status = waitOnAstrometrySubmissionDone(submission['subid'])
+        createLog(tail, status, s3)
+        if (archive_flag) :
+            archiveImage(tail, s3_imagebucket, s3)
+    else :
+        createErrorLog(tail, submission, s3)

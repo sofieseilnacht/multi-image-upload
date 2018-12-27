@@ -17,3 +17,7 @@ https://docs.python-guide.org/scenarios/json/
 https://realpython.com/python-json/
 
 http://docs.python-requests.org/en/master/user/quickstart/
+
+# virtualenv notes
+project settings - create a python SDK global to projects in ~/venv
+settings - set path to pipenv to match venv python (/usr/bin/pip-3.7)
