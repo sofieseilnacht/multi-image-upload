@@ -86,22 +86,61 @@ def getAstrometryCalibrationResults(job_ids) :
 
     return calibrations
 
+def waitOnAstrometryJobsDone(job_ids):
+    headers = {'User-Agent': 'Mozilla/5.0'}
+
+    for job_id in job_ids:
+        url = job_status_url+str(job_id)
+        response = requests.get(url, headers=headers)
+
+        while (response.status_code == 200) :
+            body = response.json()
+
+            # loop until the job is done
+            if (body['status'] == 'success') :
+                break
+
+            time.sleep(20)
+            response = requests.get(url, headers=headers)
+
 def waitOnAstrometrySubmissionDone(submissionId):
     headers = {'User-Agent': 'Mozilla/5.0'}
     url = submit_status_url+str(submissionId)
     response = requests.get(url, headers=headers)
+    jobsDoneFlag = False
 
 
     while (response.status_code == 200) :
         body = response.json()
+
+        # loop until the jobs have been created
+        jobs = body['jobs']
+        if (len(jobs) == 0 or jobs[0] == None):
+            time.sleep(20)
+            response = requests.get(url, headers=headers)
+            continue
+        elif (not jobsDoneFlag):
+            waitOnAstrometryJobsDone(jobs)
+            response = requests.get(url, headers=headers)   # make sure the response is current
+            jobsDoneFlag = True
+
+        # if the jobs are done, check for calibrations
         processing_finished = body['processing_finished']
 
-        # loop until a processing finished timestamp is in the response
-        if (processing_finished != 'None') :
-            body['job_calibrations'] = getAstrometryCalibrationResults(body['job_calibrations'])
+        if (jobsDoneFlag and (processing_finished != 'None' and processing_finished != None and processing_finished != '')):
+            # loop until the calibrations are done
+            job_calibrations = body['job_calibrations']
+
+            # if no calibrations, then we are done
+            if (len(job_calibrations) == 0 or job_calibrations[0] == None):
+                break
+
+            # job_calibrations is a list of lists, so loop over each one and then exit the loop
+            for calibrations in job_calibrations:
+                body['job_calibrations'] = getAstrometryCalibrationResults(calibrations)
             break
 
-        time.sleep(15)
+        time.sleep(20)
         response = requests.get(url, headers=headers)
 
     if (response.status_code != 200) :
@@ -224,6 +263,7 @@ url_upload_path = config['nova.astrometry.net']['url_upload_path']
 login_url = base_url+login_path
 upload_url = base_url+url_upload_path
 submit_status_url = base_url+"/api/submissions/"
+job_status_url = base_url+"/api/jobs/"
 image_dir= config['nova.astrometry.net']['image_dir']
 s3_imagebucket = config['aws.s3']['s3_bucket']
 s3_bucket_url = config['aws.s3']['s3_bucket_url']
