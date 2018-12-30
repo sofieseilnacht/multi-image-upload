@@ -2,9 +2,9 @@ import configparser
 import requests
 import os
 import boto3
-import botocore
 import json
 import time
+from google import client as google_client
 
 #log in to astrometry and return a session
 def astrometryLogin(url, apikey):
@@ -74,7 +74,7 @@ def getAstrometryCalibrationResults(job_ids) :
             if response.status_code == requests.codes.ok:
                 body = response.json()
 
-            else :
+            else:
                 print("request failed: "+job_url+", statuscode: "+str(response.status_code))
                 body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(response.status_code)}
 
@@ -86,7 +86,7 @@ def getAstrometryCalibrationResults(job_ids) :
 
     return calibrations
 
-def waitOnAstrometryJobsDone(job_ids):
+def waitOnAstrometryJobsSuccess(job_ids):
     headers = {'User-Agent': 'Mozilla/5.0'}
 
     for job_id in job_ids:
@@ -97,51 +97,57 @@ def waitOnAstrometryJobsDone(job_ids):
             body = response.json()
 
             # loop until the job is done
-            if (body['status'] == 'success') :
+            status = body['status']
+            if (status != '' and status != None) :
                 break
 
             time.sleep(20)
             response = requests.get(url, headers=headers)
 
-def waitOnAstrometrySubmissionDone(submissionId):
+def waitOnAstrometryJobDone(submissionId) :
     headers = {'User-Agent': 'Mozilla/5.0'}
     url = submit_status_url+str(submissionId)
     response = requests.get(url, headers=headers)
-    jobsDoneFlag = False
-
 
     while (response.status_code == 200) :
         body = response.json()
 
         # loop until the jobs have been created
         jobs = body['jobs']
-        if (len(jobs) == 0 or jobs[0] == None):
-            time.sleep(20)
-            response = requests.get(url, headers=headers)
-            continue
-        elif (not jobsDoneFlag):
-            waitOnAstrometryJobsDone(jobs)
-            response = requests.get(url, headers=headers)   # make sure the response is current
-            jobsDoneFlag = True
-
-        # if the jobs are done, check for calibrations
-        processing_finished = body['processing_finished']
-
-        if (jobsDoneFlag and (processing_finished != 'None' and processing_finished != None and processing_finished != '')):
-            # loop until the calibrations are done
-            job_calibrations = body['job_calibrations']
-
-            # if no calibrations, then we are done
-            if (len(job_calibrations) == 0 or job_calibrations[0] == None):
-                break
-
-            # job_calibrations is a list of lists, so loop over each one and then exit the loop
-            for calibrations in job_calibrations:
-                body['job_calibrations'] = getAstrometryCalibrationResults(calibrations)
+        if (len(jobs) != 0 and jobs[0] != None):
+            waitOnAstrometryJobsSuccess(jobs)
             break
 
         time.sleep(20)
         response = requests.get(url, headers=headers)
+
+    if (response.status_code != 200) :
+        print("request failed: "+url+", statuscode: "+str(response.status_code))
+        body = {"url" : url, "status" : "http error", "error_code" : str(response.status_code)}
+
+    return body
+
+def waitOnAstrometrySubmissionDone(submissionId):
+
+    # TODO - should account for failure in this call
+    body = waitOnAstrometryJobDone(submissionId)
+
+    url = submit_status_url+str(submissionId)
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    response = requests.get(url, headers=headers)
+
+    if (response.status_code == 200) :
+        body = response.json()
+
+        # if the jobs are done, check for calibrations
+        job_calibrations = body['job_calibrations']
+
+        # if no calibrations, then we are done
+        if (len(job_calibrations) != 0 and job_calibrations[0] != None):
+            # job_calibrations is a list of lists, so loop over each one and then exit the loop
+            for calibrations in job_calibrations:
+                body['job_calibrations'] = getAstrometryCalibrationResults(calibrations)
+                # TODO - FIX if the array has more than one entry then we overwrite
 
     if (response.status_code != 200) :
         print("request failed: "+url+", statuscode: "+str(response.status_code))
@@ -249,9 +255,8 @@ def newAstromertyUploadSettings(url, session):
         "positional_error" : 1
     }
 
-
-
     return settings
+
 
 # read configuration and create statics
 config = configparser.ConfigParser()
@@ -269,7 +274,9 @@ s3_imagebucket = config['aws.s3']['s3_bucket']
 s3_bucket_url = config['aws.s3']['s3_bucket_url']
 archive_flag = config['myapplication']['archive_flag']
 
-
+# google_client.deleteSheet("astrometry.net")
+# success_ws = google_client.openSheet("astrometry.net","success")
+# error_ws = google_client.openSheet("astrometry.net","error")
 # login
 loginSession = astrometryLogin(login_url, apikey)
 
