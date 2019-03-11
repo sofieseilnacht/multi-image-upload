@@ -1,15 +1,27 @@
-import configparser
 import requests
-import os
-import boto3
 import json
 import time
-from google import client as google_client
+import botocore
+
+from app.astrometry.config import *
+
+# def astrometryLogin(url, apikey):
+#     try:
+#         R = requests.post(url, data={'request-json': json.dumps({"apikey": apikey})})
+#         print(R.text)
+#         if (R.status_code == 200):
+#             responseJson = R.json()
+#             return responseJson["session"]
+#     except requests.exceptions.RequestException as e:
+#         print(e)
+#         raise(e)
+#
+#     return None
 
 #log in to astrometry and return a session
-def astrometryLogin(url, apikey):
+def astrometryLogin():
     try:
-        R = requests.post(url, data={'request-json': json.dumps({"apikey": apikey})})
+        R = requests.post(login_url, data={'request-json': json.dumps({"apikey": apikey})})
         print(R.text)
         if (R.status_code == 200):
             responseJson = R.json()
@@ -21,29 +33,7 @@ def astrometryLogin(url, apikey):
     return None
 
 
-#Gives a list of image files in s3 Bucket
-def listS3Files(client, bucketName, prefix):
-    #List files in specific S3 URL
-    response = client.list_objects(Bucket=bucketName, Prefix=prefix)
-    for content in response.get('Contents', []):
-      key = content.get('Key')
-      if key.endswith( ('.jpg', '.jpeg', '.png', '.gif') ):
-          yield key
-
-#gives list of files on local dir
-def listFiles(path):
-    folder = os.fsencode(path)
-    filenames = []
-    for file in os.listdir(folder):
-        filename = os.fsdecode(file)
-        if filename.endswith( ('.jpg', '.jpeg', '.png', '.gif') ): # whatever file types you're using...
-            filenames.append(filename)
-    filenames.sort() # now you have the filenames and can do something with them
-    return filenames
-
-
-def submitAstrometryUrl(file):
-    imageUrl = s3_bucket_url+'/'+file
+def submitAstrometryUrl(imageUrl, loginSession):
     headers = {'User-Agent': 'Mozilla/5.0'}
     settings = newAstromertyUploadSettings(imageUrl, loginSession)
 
@@ -57,14 +47,14 @@ def submitAstrometryUrl(file):
             print("request failed: "+imageUrl+", statuscode: "+str(response.status_code))
             body = {"url" : imageUrl, "status" : "http error", "error_code" : str(response.status_code)}
 
-    except requests.exceptions.RequestException as e:
+    except botocore.exceptions.ClientError as e:
         body = {"url" : imageUrl, "status" : "client error", "error_code" : str(e.response['Error']['Code'])}
 
     return body
 
 def getAstrometryCalibrationResults(job_ids) :
     headers = {'User-Agent': 'Mozilla/5.0'}
-    calibrations = []
+    calibrations = {}
 
     for job_id in job_ids:
         job_url = base_url+'/api/jobs/'+str(job_id)+'/calibration/'
@@ -82,7 +72,36 @@ def getAstrometryCalibrationResults(job_ids) :
             print("request failed: "+job_url+", statuscode: "+str(response.status_code))
             body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(e.response['Error']['Code'])}
 
-        calibrations.append(body)
+        #calibrations.append(body)
+        calibrations[job_id ] = body
+
+    return calibrations
+
+def getCalibrationsFitsFiles(job_ids) :
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    calibrations = {}
+
+    for job_id in job_ids:
+        #http://nova.astrometry.net/new_fits_file/JOBID
+        job_url = base_url+'/new_fits_file/'+str(job_id)
+        try:
+            response = requests.get(job_url, headers=headers)
+
+            if response.status_code == requests.codes.ok:
+                #body = response.text
+                body = response.content
+                #body = response.json()
+                #print(body)
+            else:
+                print("request failed: "+job_url+", statuscode: "+str(response.status_code))
+                body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(response.status_code)}
+
+        except requests.exceptions.RequestException as e:
+            print("request failed: "+job_url+", statuscode: "+str(response.status_code))
+            body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(e.response['Error']['Code'])}
+
+        #calibrations.append(body)
+        calibrations[job_id ] = body
 
     return calibrations
 
@@ -98,7 +117,7 @@ def waitOnAstrometryJobsSuccess(job_ids):
 
             # loop until the job is done
             status = body['status']
-            if (status != '' and status != None) :
+            if (status == 'success' or status == 'failure') :
                 break
 
             time.sleep(20)
@@ -109,6 +128,7 @@ def waitOnAstrometryJobDone(submissionId) :
     url = submit_status_url+str(submissionId)
     response = requests.get(url, headers=headers)
 
+    print('waitOnAstrometryJobDone: ' + str(submissionId)+ ' ', end='')
     while (response.status_code == 200) :
         body = response.json()
 
@@ -117,7 +137,7 @@ def waitOnAstrometryJobDone(submissionId) :
         if (len(jobs) != 0 and jobs[0] != None):
             waitOnAstrometryJobsSuccess(jobs)
             break
-
+        print('.', end='', flush=True)
         time.sleep(20)
         response = requests.get(url, headers=headers)
 
@@ -125,12 +145,14 @@ def waitOnAstrometryJobDone(submissionId) :
         print("request failed: "+url+", statuscode: "+str(response.status_code))
         body = {"url" : url, "status" : "http error", "error_code" : str(response.status_code)}
 
+    print(' done')
     return body
 
 def waitOnAstrometrySubmissionDone(submissionId):
 
     # TODO - should account for failure in this call
     body = waitOnAstrometryJobDone(submissionId)
+    fits = []
 
     url = submit_status_url+str(submissionId)
     headers = {'User-Agent': 'Mozilla/5.0'}
@@ -148,30 +170,36 @@ def waitOnAstrometrySubmissionDone(submissionId):
             for calibrations in job_calibrations:
                 body['job_calibrations'] = getAstrometryCalibrationResults(calibrations)
                 # TODO - FIX if the array has more than one entry then we overwrite
+                fits = getCalibrationsFitsFiles(calibrations)
+    if (response.status_code != 200) :
+        print("request failed: "+url+", statuscode: "+str(response.status_code))
+        body = {"url" : url, "status" : "http error", "error_code" : str(response.status_code)}
+
+    return {'body':body,'fits':fits}
+
+def waitOnAstrometrySubmissionDoneOld(submissionId):
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    url = submit_status_url+str(submissionId)
+    response = requests.get(url, headers=headers)
+
+
+    while (response.status_code == 200) :
+        body = response.json()
+        processing_finished = body['processing_finished']
+        jobs = body[jobs]
+        # loop until a processing finished timestamp is in the response
+        if (processing_finished != 'None') :
+            body['job_calibrations'] = getAstrometryCalibrationResults(body['job_calibrations'])
+            break
+
+        time.sleep(15)
+        response = requests.get(url, headers=headers)
 
     if (response.status_code != 200) :
         print("request failed: "+url+", statuscode: "+str(response.status_code))
         body = {"url" : url, "status" : "http error", "error_code" : str(response.status_code)}
 
     return body
-
-def archiveImage(file, bucket, s3):
-    copyResponse = s3.meta.client.copy_object(
-        ACL='public-read',
-        Bucket=bucket,
-        CopySource={'Bucket': bucket, 'Key': "pending/"+file},
-        Key="archive/"+file
-    )
-    if (copyResponse['ResponseMetadata']['HTTPStatusCode'] == 200) :
-        deleteResponse = s3.meta.client.delete_object(Bucket=bucket, Key="pending/"+file)
-
-def createLog(name, data, s3):
-    logObject = s3.Object(s3_imagebucket, 'logs/'+name+".json")
-    logObject.put(Body=json.dumps(data))
-
-def createErrorLog(name, data, s3):
-    logObject = s3.Object(s3_imagebucket, 'errors/'+name+".json")
-    logObject.put(Body=json.dumps(data))
 
 #won't work for JB image because have to split pics between invert and regular
 def newAstromertyUploadSettings(url, session):
@@ -257,45 +285,3 @@ def newAstromertyUploadSettings(url, session):
 
     return settings
 
-
-# read configuration and create statics
-config = configparser.ConfigParser()
-config.read('myconfig.ini')
-apikey = config['nova.astrometry.net']['apikey']
-base_url = config['nova.astrometry.net']['base_url']
-login_path = config['nova.astrometry.net']['login_path']
-url_upload_path = config['nova.astrometry.net']['url_upload_path']
-login_url = base_url+login_path
-upload_url = base_url+url_upload_path
-submit_status_url = base_url+"/api/submissions/"
-job_status_url = base_url+"/api/jobs/"
-image_dir= config['nova.astrometry.net']['image_dir']
-s3_imagebucket = config['aws.s3']['s3_bucket']
-s3_bucket_url = config['aws.s3']['s3_bucket_url']
-archive_flag = config['myapplication']['archive_flag']
-
-# google_client.deleteSheet("astrometry.net")
-# success_ws = google_client.openSheet("astrometry.net","success")
-# error_ws = google_client.openSheet("astrometry.net","error")
-# login
-loginSession = astrometryLogin(login_url, apikey)
-
-# return file generator over S3 bucket
-client = boto3.client('s3')
-files = listS3Files(client, s3_imagebucket, 'pending/')
-
-s3 = boto3.resource('s3')
-for file in files:
-
-    # initial file meta data as part of log data (where from, who from, original url, ...)
-    submission = submitAstrometryUrl(file)
-    (head, tail) = os.path.split(file)
-
-    if ('status' in submission) :
-        if (submission['status'] == 'success') :
-            status = waitOnAstrometrySubmissionDone(submission['subid'])
-            createLog(tail, status, s3)
-        if (archive_flag) :
-            archiveImage(tail, s3_imagebucket, s3)
-    else :
-        createErrorLog(tail, submission, s3)

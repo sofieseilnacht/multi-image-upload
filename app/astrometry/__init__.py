@@ -10,6 +10,6 @@ url_upload_path = config['nova.astrometry.net']['url_upload_path']
 login_url = base_url+login_path
 upload_url = base_url+url_upload_path
 submit_status_url = base_url+"/api/submissions/"
-image_dir= config['nova.astrometry.net']['image_dir']
+#image_dir= config['nova.astrometry.net']['image_dir']
 # s3_imagebucket = config['aws.s3']['s3_bucket']
 # s3_bucket_url = config['aws.s3']['s3_bucket_url']
