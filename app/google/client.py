@@ -48,8 +48,16 @@ class Client:
                 i+=1
             worksheet.append_row(values=successData, value_input_option='RAW')
 
-
-    #def addErrorToSheet(worksheet, url, astrometrySubmission):
+    def addErrorToSheet(self, worksheet, imageurl, astrometrySubmission):
+    # for calibration in astrometryStatus['job_calibrations']:
+        errorData = []
+    #     i = 0
+    #     successData[i]= imageUrl
+    #     i+=1
+    #     for key in self.table_headers:
+    #         successData[i] = calibration[key]
+    #         i+=1
+        worksheet.append_row(values=errorData, value_input_option='RAW')
 
 
     def deleteSheet(self, spreadsheet):

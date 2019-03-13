@@ -56,8 +56,9 @@ def createLog(name, data):
 
 def createFitsFiles(name, fitsFileList):
     for fitsJobID in fitsFileList.keys():
-        fitsImage = fitsFileList[fitsJobID]
         fitsJobIDStr = "{0}".format(fitsJobID)
+        print('createFitsFile: '+fitsJobIDStr)
+        fitsImage = fitsFileList[fitsJobID]
         name = 'fits/'+name+"-"+fitsJobIDStr+".fits"
         logObject = s3.Object(s3_imagebucket, name)
         logObject.put(Body= (fitsImage))

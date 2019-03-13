@@ -30,24 +30,26 @@ def uploadImages(imageBucketName, imageBucketUrl, archiveFlag) :
 
                 status = waitOnAstrometrySubmissionDone(submission['subid'])
                 createLog(tail, status['body'])
-                createFitsFiles(tail, status['fits'])
+                #only get fits files if we get a calibration
+                if (len(status['body']['job_calibrations']) > 0) :
+                    createFitsFiles(tail, status['fits'])
 
                 #if soln, create fits and move image to archive. if no fits, move image to error
                 imageUrl = imageBucketUrl+'/'+imageBucketName+'/archive/'+file
                 if (len(status['fits']) == 0) :
                     moveImage(tail, imageBucketName, 'error')
-                    Client.addSuccessToSheet(error_ws, imageUrl, 'none', status, status)
+                    google_client.addErrorToSheet(error_ws, imageUrl, submission)
 
                 else:
                    moveImage(tail, imageBucketName, 'archive')
                    fitsUrl = imageBucketUrl+'/'+imageBucketName+'/fits/'+file
-                   Client.addSuccessToSheet(success_ws, imageUrl, fitsUrl, status, status)
+                   google_client.addSuccessToSheet(success_ws, imageUrl, fitsUrl, status)
 
 
         else:
             createErrorLog(tail, submission)
             moveImage(tail, imageBucketName, 'error')
-            Client.addErrorToSheet(error_ws, imageUrl, 'none', submission)
+            google_client.addErrorToSheet(error_ws, imageUrl, submission)
 
 
 

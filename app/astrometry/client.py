@@ -155,6 +155,7 @@ def waitOnAstrometrySubmissionDone(submissionId):
     fits = []
 
     url = submit_status_url+str(submissionId)
+    print('waitOnAstrometrySubmissionDone: '+url)
     headers = {'User-Agent': 'Mozilla/5.0'}
     response = requests.get(url, headers=headers)
 
@@ -166,11 +167,12 @@ def waitOnAstrometrySubmissionDone(submissionId):
 
         # if no calibrations, then we are done
         if (len(job_calibrations) != 0 and job_calibrations[0] != None):
+            calibrations = set(job_calibrations).symmetric_difference(body['jobs'])
+            assert(len(calibrations) == 0 or len(calibrations) == 1)
             # job_calibrations is a list of lists, so loop over each one and then exit the loop
-            for calibrations in job_calibrations:
-                body['job_calibrations'] = getAstrometryCalibrationResults(calibrations)
-                # TODO - FIX if the array has more than one entry then we overwrite
-                fits = getCalibrationsFitsFiles(calibrations)
+            # for calibration in calibrations:
+            body['job_calibrations'] = getAstrometryCalibrationResults(calibrations)
+            fits = getCalibrationsFitsFiles(calibrations)
     if (response.status_code != 200) :
         print("request failed: "+url+", statuscode: "+str(response.status_code))
         body = {"url" : url, "status" : "http error", "error_code" : str(response.status_code)}
