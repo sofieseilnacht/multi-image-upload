@@ -38,6 +38,7 @@ def submitAstrometryUrl(imageUrl, loginSession):
     settings = newAstromertyUploadSettings(imageUrl, loginSession)
 
     try:
+        print('submitAstrometryUrl: '+imageUrl)
         response = requests.post(upload_url, headers=headers, data={'request-json': json.dumps(settings)})
 
         if (response.status_code == 200) :
@@ -48,62 +49,93 @@ def submitAstrometryUrl(imageUrl, loginSession):
             body = {"url" : imageUrl, "status" : "http error", "error_code" : str(response.status_code)}
 
     except botocore.exceptions.ClientError as e:
+        print("request failed: "+upload_url+", error_code: "+ str(e.response['Error']['Code']))
         body = {"url" : imageUrl, "status" : "client error", "error_code" : str(e.response['Error']['Code'])}
 
     return body
 
-def getAstrometryCalibrationResults(job_ids) :
+# def getAstrometryCalibrationResults(job_ids) :
+#     headers = {'User-Agent': 'Mozilla/5.0'}
+#     calibrations = {}
+#
+#     for job_id in job_ids:
+#         job_url = base_url+'/api/jobs/'+str(job_id)+'/calibration/'
+#         try:
+#             response = requests.get(job_url, headers=headers)
+#
+#             if response.status_code == requests.codes.ok:
+#                 body = response.json()
+#
+#             else:
+#                 print("request failed: "+job_url+", statuscode: "+str(response.status_code))
+#                 body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(response.status_code)}
+#
+#         except requests.exceptions.RequestException as e:
+#             print("request failed: "+job_url+", statuscode: "+str(response.status_code))
+#             body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(e.response['Error']['Code'])}
+#
+#         calibrations[job_id ] = body
+#
+#     return calibrations
+
+def getJobInfo(job_id) :
     headers = {'User-Agent': 'Mozilla/5.0'}
-    calibrations = {}
+    job_url = base_url+'/jobs/'+str(job_id)+'/info/'
 
-    for job_id in job_ids:
-        job_url = base_url+'/api/jobs/'+str(job_id)+'/calibration/'
-        try:
-            response = requests.get(job_url, headers=headers)
+    try:
+        response = requests.get(job_url, headers=headers)
 
-            if response.status_code == requests.codes.ok:
-                body = response.json()
-
-            else:
-                print("request failed: "+job_url+", statuscode: "+str(response.status_code))
-                body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(response.status_code)}
-
-        except requests.exceptions.RequestException as e:
+        if response.status_code == requests.codes.ok:
+            body = response.json()
+        else:
             print("request failed: "+job_url+", statuscode: "+str(response.status_code))
-            body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(e.response['Error']['Code'])}
+            body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(response.status_code)}
 
-        #calibrations.append(body)
-        calibrations[job_id ] = body
+    #TODO - think about letting exception to reach top most error handler
+    except requests.exceptions.RequestException as e:
+        print("request failed: "+job_url+", statuscode: "+str(response.status_code))
+        body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(e.response['Error']['Code'])}
 
-    return calibrations
+    return body
 
-def getCalibrationsFitsFiles(job_ids) :
+def getCalibrationsFitsFiles(calibration_ids) :
+    fitsFiles = {}
+
+    # if no work to do, then return
+    if len(calibration_ids) == 0 or calibration_ids[0] == None :
+        return fitsFiles
+
+    # iterate over the (job_id, calibration_id) tuples
+    for calibration_pair in calibration_ids:
+        job_id = calibration_pair[0]
+        calibration_id = calibration_pair[1]
+
+        fitsFiles[job_id] = getCalibrationsFitsFile(job_id)
+
+        # EXPERIMENT - with job info
+        # job_info = getJobInfo(job_id)
+
+    return fitsFiles
+
+def getCalibrationsFitsFile(job_id) :
     headers = {'User-Agent': 'Mozilla/5.0'}
-    calibrations = {}
 
-    for job_id in job_ids:
-        #http://nova.astrometry.net/new_fits_file/JOBID
-        job_url = base_url+'/new_fits_file/'+str(job_id)
-        try:
-            response = requests.get(job_url, headers=headers)
+    #http://nova.astrometry.net/new_fits_file/JOBID
+    job_url = base_url+'/new_fits_file/'+str(job_id)
+    try:
+        response = requests.get(job_url, headers=headers)
 
-            if response.status_code == requests.codes.ok:
-                #body = response.text
-                body = response.content
-                #body = response.json()
-                #print(body)
-            else:
-                print("request failed: "+job_url+", statuscode: "+str(response.status_code))
-                body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(response.status_code)}
-
-        except requests.exceptions.RequestException as e:
+        if response.status_code == requests.codes.ok:
+            body = response.content
+        else:
             print("request failed: "+job_url+", statuscode: "+str(response.status_code))
-            body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(e.response['Error']['Code'])}
+            body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(response.status_code)}
 
-        #calibrations.append(body)
-        calibrations[job_id ] = body
+    except requests.exceptions.RequestException as e:
+        print("request failed: "+job_url+", statuscode: "+str(response.status_code))
+        body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(e.response['Error']['Code'])}
 
-    return calibrations
+    return body
 
 def waitOnAstrometryJobsSuccess(job_ids):
     headers = {'User-Agent': 'Mozilla/5.0'}
@@ -112,6 +144,7 @@ def waitOnAstrometryJobsSuccess(job_ids):
         url = job_status_url+str(job_id)
         response = requests.get(url, headers=headers)
 
+        print("waitOnAstrometryJobsSuccess: "+str(job_id)+' ', end='')
         while (response.status_code == 200) :
             body = response.json()
 
@@ -120,8 +153,15 @@ def waitOnAstrometryJobsSuccess(job_ids):
             if (status == 'success' or status == 'failure') :
                 break
 
-            time.sleep(20)
+            print('.', end='', flush=True)
+            time.sleep(15)
             response = requests.get(url, headers=headers)
+        print(' done')
+# def waitOnAstronomyJob(submissionId) :
+#     #
+#     body = waitOnAstrometryJobDone(submissionId)
+#     waitOnAstrometryJobsSuccess(body['jobs'])
+#     return body
 
 def waitOnAstrometryJobDone(submissionId) :
     headers = {'User-Agent': 'Mozilla/5.0'}
@@ -129,16 +169,22 @@ def waitOnAstrometryJobDone(submissionId) :
     response = requests.get(url, headers=headers)
 
     print('waitOnAstrometryJobDone: ' + str(submissionId)+ ' ', end='')
-    while (response.status_code == 200) :
+    done = False
+
+    while (not done) :
         body = response.json()
 
-        # loop until the jobs have been created
+        # loop until the jobs have been created or communication failure
         jobs = body['jobs']
         if (len(jobs) != 0 and jobs[0] != None):
-            waitOnAstrometryJobsSuccess(jobs)
+            done = True
             break
+        elif (response.status_code != 200):
+            done = True
+            break
+
         print('.', end='', flush=True)
-        time.sleep(20)
+        time.sleep(15)
         response = requests.get(url, headers=headers)
 
     if (response.status_code != 200) :
@@ -148,60 +194,94 @@ def waitOnAstrometryJobDone(submissionId) :
     print(' done')
     return body
 
-def waitOnAstrometrySubmissionDone(submissionId):
-
-    # TODO - should account for failure in this call
-    body = waitOnAstrometryJobDone(submissionId)
-    fits = []
-
-    url = submit_status_url+str(submissionId)
-    print('waitOnAstrometrySubmissionDone: '+url)
+def getJobCalibration(job_id):
     headers = {'User-Agent': 'Mozilla/5.0'}
+    url = base_url+'/api/jobs/'+str(job_id)+'/calibration/'
+
+    print("getJobCalibration: "+str(job_id), end='')
     response = requests.get(url, headers=headers)
 
-    if (response.status_code == 200) :
-        body = response.json()
-
-        # if the jobs are done, check for calibrations
-        job_calibrations = body['job_calibrations']
-
-        # if no calibrations, then we are done
-        if (len(job_calibrations) != 0 and job_calibrations[0] != None):
-            calibrations = set(job_calibrations).symmetric_difference(body['jobs'])
-            assert(len(calibrations) == 0 or len(calibrations) == 1)
-            # job_calibrations is a list of lists, so loop over each one and then exit the loop
-            # for calibration in calibrations:
-            body['job_calibrations'] = getAstrometryCalibrationResults(calibrations)
-            fits = getCalibrationsFitsFiles(calibrations)
-    if (response.status_code != 200) :
-        print("request failed: "+url+", statuscode: "+str(response.status_code))
-        body = {"url" : url, "status" : "http error", "error_code" : str(response.status_code)}
-
-    return {'body':body,'fits':fits}
-
-def waitOnAstrometrySubmissionDoneOld(submissionId):
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    url = submit_status_url+str(submissionId)
-    response = requests.get(url, headers=headers)
-
-
-    while (response.status_code == 200) :
-        body = response.json()
-        processing_finished = body['processing_finished']
-        jobs = body[jobs]
-        # loop until a processing finished timestamp is in the response
-        if (processing_finished != 'None') :
-            body['job_calibrations'] = getAstrometryCalibrationResults(body['job_calibrations'])
-            break
-
+    while (response.status_code != 200) :
+        print('.', end='', flush=True)
         time.sleep(15)
         response = requests.get(url, headers=headers)
 
     if (response.status_code != 200) :
         print("request failed: "+url+", statuscode: "+str(response.status_code))
         body = {"url" : url, "status" : "http error", "error_code" : str(response.status_code)}
+    else:
+        body = response.json()
 
+    print(' done')
     return body
+
+
+def getJobCalibrations(job_ids):
+    calibrations = {}
+    # iterate over the (job_id, calibration_id) tuples
+    for job_id in job_ids:
+
+        calibrations[job_id] = getJobCalibration(job_id)
+
+    return calibrations
+
+def waitOnAstrometrySubmissionDone(submissionId):
+
+    # wait until the submission has created and run a job
+    body = waitOnAstrometryJobDone(submissionId)
+    waitOnAstrometryJobsSuccess(body['jobs'])
+    # refresh job data
+    body = waitOnAstrometryJobDone(submissionId)
+    body['calibration_results'] = getJobCalibrations(body['jobs'])
+    fits = getCalibrationsFitsFiles(body['job_calibrations'])
+
+    # url = submit_status_url+str(submissionId)
+    # print('waitOnAstrometrySubmissionDone: '+url)
+    # headers = {'User-Agent': 'Mozilla/5.0'}
+    # response = requests.get(url, headers=headers)
+    #
+    # if (response.status_code == 200) :
+    #     body = response.json()
+    #
+    #     # if the jobs are done, check for calibrations
+    #     job_calibrations = body['job_calibrations']
+    #
+    #     # if no calibrations, then we are done
+    #     if (len(job_calibrations) != 0 and job_calibrations[0] != None):
+    #         for calibration_pair in job_calibrations :
+    #             job_id = calibration_pair[0]
+    #             calibration_id = calibration_pair[1]
+    #             #body['job_calibrations'] = getAstrometryCalibrationResults(job_id)
+    #             fits_results[job_id] = getCalibrationsFitsFile(job_id)
+    # if (response.status_code != 200) :
+    #     print("request failed: "+url+", statuscode: "+str(response.status_code))
+    #     body = {"url" : url, "status" : "http error", "error_code" : str(response.status_code)}
+
+    return {'body':body,'fits':fits}
+
+# def waitOnAstrometrySubmissionDoneOld(submissionId):
+#     headers = {'User-Agent': 'Mozilla/5.0'}
+#     url = submit_status_url+str(submissionId)
+#     response = requests.get(url, headers=headers)
+#
+#
+#     while (response.status_code == 200) :
+#         body = response.json()
+#         processing_finished = body['processing_finished']
+#         jobs = body[jobs]
+#         # loop until a processing finished timestamp is in the response
+#         if (processing_finished != 'None') :
+#             body['job_calibrations'] = getAstrometryCalibrationResults(body['job_calibrations'])
+#             break
+#
+#         time.sleep(15)
+#         response = requests.get(url, headers=headers)
+#
+#     if (response.status_code != 200) :
+#         print("request failed: "+url+", statuscode: "+str(response.status_code))
+#         body = {"url" : url, "status" : "http error", "error_code" : str(response.status_code)}
+#
+#     return body
 
 #won't work for JB image because have to split pics between invert and regular
 def newAstromertyUploadSettings(url, session):
@@ -282,7 +362,10 @@ def newAstromertyUploadSettings(url, session):
         ##settings['image_height'] = '',
 
         # positional_error: float, expected error on the positions of stars in your image. Default is 1.
-        "positional_error" : 1
+        "positional_error" : 1,
+
+        # invert : 'on' or 'off' to invert image for solution
+        "invert" : 'off'
     }
 
     return settings

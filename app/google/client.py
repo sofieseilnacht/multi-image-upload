@@ -4,7 +4,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 from app.google.config import *
 
 class Client:
-    table_headers = ['id','image-url', 'fits-url', 'parity', 'orientation', 'pixscale','radius','ra','dec']
+    table_headers = ['id','image-url', 'log-url', 'fits-url', 'parity', 'orientation', 'pixscale','radius','ra','dec']
+    etable_headers = ['id','image-url','log-url', 'error']
 
     ## docs https://gspread.readthedocs.io/en/latest/index.html
     def openSheet(self, spreadsheet, worksheet):
@@ -37,27 +38,33 @@ class Client:
             i+=1
         worksheet.append_row(values=rowData, value_input_option='RAW')
 
-    def addSuccessToSheet(self, worksheet, imageUrl, fitsUrl, astrometryStatus):
-        for calibration in astrometryStatus['job_calibrations']:
-            successData = []
+    def addSuccessToSheet(self, worksheet, imageUrl, logUrl, fitsUrlList, calibrationResultList):
+        for jobId in fitsUrlList.keys():
+            if jobId in calibrationResultList :
+                rowData = []
+                for columnKey in self.table_headers:
+                    if columnKey == 'id' :
+                        rowData.append(str(jobId))
+                    elif columnKey == 'image-url' :
+                        rowData.append(imageUrl)
+                    elif columnKey == 'log-url' :
+                        rowData.append(logUrl)
+                    elif columnKey == 'fits-url' :
+                        rowData.append(fitsUrlList[jobId])
+                    else :
+                        rowData.append(calibrationResultList[jobId][columnKey])
+                worksheet.append_row(values=rowData, value_input_option='RAW')
+
+    def addErrorToSheet(self, worksheet, imageUrl,logUrl, astrometrySubmission):
+        for calibration in astrometrySubmission['jobs']:
+            errorData = []
             i = 0
-            successData[i]= imageUrl
+            errorData[i]= imageUrl
             i+=1
             for key in self.table_headers:
-                successData[i] = calibration[key]
+                errorData[i] = calibration[key]
                 i+=1
-            worksheet.append_row(values=successData, value_input_option='RAW')
-
-    def addErrorToSheet(self, worksheet, imageurl, astrometrySubmission):
-    # for calibration in astrometryStatus['job_calibrations']:
-        errorData = []
-    #     i = 0
-    #     successData[i]= imageUrl
-    #     i+=1
-    #     for key in self.table_headers:
-    #         successData[i] = calibration[key]
-    #         i+=1
-        worksheet.append_row(values=errorData, value_input_option='RAW')
+            worksheet.append_row(values=errorData, value_input_option='RAW')
 
 
     def deleteSheet(self, spreadsheet):

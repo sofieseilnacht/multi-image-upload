@@ -4,6 +4,15 @@ from .astrometry.client import *
 from .aws.client import *
 from .google.client import Client
 
+def hasFitsFiles(fitsList) :
+    return len(fitsList) > 0
+
+def createFitsUrlList (imageBucketUrl, imageBucketName, fitsFileList):
+    fitsUrlList = {}
+    for key in fitsFileList.keys() :
+        fitsUrlList[key] = imageBucketUrl+'/'+imageBucketName+'/fits/'+fitsFileList[key]
+    return fitsUrlList
+
 def uploadImages(imageBucketName, imageBucketUrl, archiveFlag) :
     google_client = Client()
     #google_client.deleteSheet("astrometry.net")
@@ -17,39 +26,34 @@ def uploadImages(imageBucketName, imageBucketUrl, archiveFlag) :
     files = listS3Files(imageBucketName, 'pending/')
 
     for file in files:
-        print('procesing: '+ file)
+        print('processing: '+ file)
         # initial file meta data as part of log data (where from, who from, original url, ...)
         setPublicReadPermissions(file)
         imageUrl = s3_bucket_url+'/'+file
-        submission = submitAstrometryUrl(imageUrl,loginSession)
+        submissionStatus = submitAstrometryUrl(imageUrl,loginSession)
         (head, tail) = os.path.split(file)
 
-        if ('status' in submission) :
+        if ('status' in submissionStatus) :
 
-            if (submission['status'] == 'success') :
+            if (submissionStatus['status'] == 'success') :
 
-                status = waitOnAstrometrySubmissionDone(submission['subid'])
-                createLog(tail, status['body'])
-                #only get fits files if we get a calibration
-                if (len(status['body']['job_calibrations']) > 0) :
-                    createFitsFiles(tail, status['fits'])
+                submission = waitOnAstrometrySubmissionDone(submissionStatus['subid'])
+                logUrl = createLog(tail, submission['body'])
 
                 #if soln, create fits and move image to archive. if no fits, move image to error
-                imageUrl = imageBucketUrl+'/'+imageBucketName+'/archive/'+file
-                if (len(status['fits']) == 0) :
-                    moveImage(tail, imageBucketName, 'error')
-                    google_client.addErrorToSheet(error_ws, imageUrl, submission)
-
-                else:
-                   moveImage(tail, imageBucketName, 'archive')
-                   fitsUrl = imageBucketUrl+'/'+imageBucketName+'/fits/'+file
-                   google_client.addSuccessToSheet(success_ws, imageUrl, fitsUrl, status)
-
+                if (hasFitsFiles(submission['fits'])) :
+                    imageUrl = moveImage(tail, imageBucketName, 'archive')
+                    fitsFileUrlList = createFitsFiles(tail, submission['fits'])
+                    google_client.addSuccessToSheet(success_ws, imageUrl, logUrl, fitsFileUrlList, submission['body']['calibration_results'])
+                else :
+                    imageUrl = moveImage(tail, imageBucketName, 'error')
+                    google_client.addErrorToSheet(error_ws, imageUrl, logUrl, submission['body'])
 
         else:
-            createErrorLog(tail, submission)
-            moveImage(tail, imageBucketName, 'error')
-            google_client.addErrorToSheet(error_ws, imageUrl, submission)
+            logUrl = createErrorLog(tail, submissionStatus)
+            imageUrl = moveImage(tail, imageBucketName, 'error')
+            google_client.addErrorToSheet(error_ws, imageUrl, logUrl, submissionStatus)
+
 
 
 

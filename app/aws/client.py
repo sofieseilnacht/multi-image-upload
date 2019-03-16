@@ -40,31 +40,46 @@ def setPublicReadPermissions(path):
 #         deleteResponse = s3.meta.client.delete_object(Bucket=bucket, Key="pending/"+file)
 
 def moveImage(file, bucket, key):
+    setPublicReadPermissions('pending/'+file)
     copyResponse = s3.meta.client.copy_object(
         ACL='public-read',
         Bucket=bucket,
         CopySource={'Bucket': bucket, 'Key': "pending/"+file},
         Key=key+"/"+file
     )
+    setPublicReadPermissions(key+'/'+file)
     if (copyResponse['ResponseMetadata']['HTTPStatusCode'] == 200) :
         deleteResponse = s3.meta.client.delete_object(Bucket=bucket, Key="pending/"+file)
 
+    archiveUrl = getFileUrl(key+'/'+file)
+    return archiveUrl
+
 def createLog(name, data):
-    logObject = s3.Object(s3_imagebucket, 'logs/'+name+".json")
-    logObject.put(Body=json.dumps(data))
-    setPublicReadPermissions('logs/'+name+".json")
+    url = getFileUrl('logs/'+name+'.json')
+    logObject = s3.Object(s3_imagebucket, 'logs/'+name+'.json')
+    logObject.put(Body=json.dumps(data),ContentType='application/json')
+    setPublicReadPermissions('logs/'+name+'.json')
+    return url
 
 def createFitsFiles(name, fitsFileList):
+    # return if no work to do
+    if (len(fitsFileList) == 0) :
+        return
+    fitsUrlList = {}
     for fitsJobID in fitsFileList.keys():
         fitsJobIDStr = "{0}".format(fitsJobID)
         print('createFitsFile: '+fitsJobIDStr)
         fitsImage = fitsFileList[fitsJobID]
         name = 'fits/'+name+"-"+fitsJobIDStr+".fits"
+        fitsUrlList[fitsJobID] = getFileUrl(name)
         logObject = s3.Object(s3_imagebucket, name)
         logObject.put(Body= (fitsImage))
         setPublicReadPermissions(name)
+    return fitsUrlList
 
 def createErrorLog(name, data):
-    logObject = s3.Object(s3_imagebucket, 'errors/'+name+".json")
+    url = getFileUrl('errors/'+name+'.json')
+    logObject = s3.Object(s3_imagebucket, 'errors/'+name+'.json')
     logObject.put(Body=json.dumps(data))
-    setPublicReadPermissions('errors/'+name+".json")
+    setPublicReadPermissions('errors/'+name+'.json')
+    return url
