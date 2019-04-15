@@ -27,7 +27,7 @@ def listS3Files(bucketName, prefix):
 def setPublicReadPermissions(path):
     object_acl = s3.ObjectAcl(s3_imagebucket,path)
     response = object_acl.put(ACL='public-read')
-
+    return response
 
 # def archiveImage(file, bucket):
 #     copyResponse = s3.meta.client.copy_object(
@@ -73,7 +73,7 @@ def createFitsFiles(name, fitsFileList):
         name = 'fits/'+name+"-"+fitsJobIDStr+".fits"
         fitsUrlList[fitsJobID] = getFileUrl(name)
         logObject = s3.Object(s3_imagebucket, name)
-        logObject.put(Body= (fitsImage))
+        logObject.put(Body= (fitsImage), ACL='public-read')
         setPublicReadPermissions(name)
     return fitsUrlList
 

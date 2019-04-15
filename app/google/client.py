@@ -58,12 +58,11 @@ class Client:
     def addErrorToSheet(self, worksheet, imageUrl,logUrl, astrometrySubmission):
         for calibration in astrometrySubmission['jobs']:
             errorData = []
-            i = 0
-            errorData[i]= imageUrl
-            i+=1
-            for key in self.table_headers:
-                errorData[i] = calibration[key]
-                i+=1
+            errorData.append('-1') #fix later HACK
+            errorData.append(imageUrl)
+            errorData.append(logUrl)
+            errorData.append(astrometrySubmission)
+
             worksheet.append_row(values=errorData, value_input_option='RAW')
 
 

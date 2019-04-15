@@ -77,26 +77,64 @@ def submitAstrometryUrl(imageUrl, loginSession):
 #         calibrations[job_id ] = body
 #
 #     return calibrations
-
-def getJobInfo(job_id) :
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    job_url = base_url+'/jobs/'+str(job_id)+'/info/'
-
+def getUrl(headers, url):
     try:
-        response = requests.get(job_url, headers=headers)
+        response = requests.get(url, headers=headers)
 
         if response.status_code == requests.codes.ok:
             body = response.json()
         else:
-            print("request failed: "+job_url+", statuscode: "+str(response.status_code))
-            body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(response.status_code)}
+            print("request failed: "+url+", statuscode: "+str(response.status_code))
+            body = {"url" : url, "status" : "http error", "error_code" : str(response.status_code)}
 
-    #TODO - think about letting exception to reach top most error handler
+    #TODO - throw astrometryException
     except requests.exceptions.RequestException as e:
-        print("request failed: "+job_url+", statuscode: "+str(response.status_code))
-        body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(e.response['Error']['Code'])}
+        print("request failed: "+url+", statuscode: "+str(response.status_code))
+        body = {"url" : url, "status" : "http error", "error_code" : str(e.response['Error']['Code'])}
 
     return body
+
+def getJobCalibration2(job_id) :
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    url = base_url+'/api/jobs/'+str(job_id)+'/calibration/'
+    result = getUrl(headers, url)
+    return result
+
+def getJobMachineTags(job_id) :
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    url = base_url+'/api/jobs/'+str(job_id)+'/machine_tags/'
+    result = getUrl(headers, url)
+    return result
+
+def getJobMachineTags(job_id) :
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    url = base_url+'/api/jobs/'+str(job_id)+'/tags/'
+    result = getUrl(headers, url)
+    return result
+
+def checkCalibrationStatus(job_id):
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    url = base_url+'/api/jobs/'+str(job_id)+'/calibration/'
+    result = getUrl(headers, url)
+    return result
+
+def checkSubmissionStatus(submission_id):
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    url = base_url+'/api/submissions/'+str(submission_id)
+    result = getUrl(headers, url)
+    return result
+
+def getJobStatus(job_id):
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    url = base_url+'/api/jobs/'+str(job_id)
+    result = getUrl(headers, url)
+    return result
+
+def getJobInfo(job_id) :
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    url = base_url+'/api/jobs/'+str(job_id)+'/info/'
+    result = getUrl(headers, url)
+    return result
 
 def getCalibrationsFitsFiles(calibration_ids) :
     fitsFiles = {}
