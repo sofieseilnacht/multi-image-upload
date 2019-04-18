@@ -9,6 +9,7 @@ login_path = config['nova.astrometry.net']['login_path']
 
 url_upload_path = config['nova.astrometry.net']['url_upload_path']
 upload_url = base_url+url_upload_path
+web_upload_url = "http://nova.astrometry.net/upload"
 
 login_url = base_url+login_path
 submit_status_url = base_url+"/api/submissions/"

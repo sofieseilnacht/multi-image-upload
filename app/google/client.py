@@ -4,7 +4,9 @@ from oauth2client.service_account import ServiceAccountCredentials
 from app.google.config import *
 
 class Client:
-    table_headers = ['id','image-url', 'log-url', 'fits-url', 'parity', 'orientation', 'pixscale','radius','ra','dec']
+    table_headers = ['id','image-url', 'ra', 'dec', 'parity', 'orientation', 'pixscale', 'radius',
+                     'image-url', 'log-url', 'wcs-fits-url', 'new-fits-url', 'rdls-fits-url', 'axy-fits-url',
+                     'corr-fits-url','annotated-image-url','red-green-image-url', 'extraction-image-url']
     etable_headers = ['id','image-url','log-url', 'error']
 
     ## docs https://gspread.readthedocs.io/en/latest/index.html
@@ -36,6 +38,18 @@ class Client:
         for key in self.table_headers:
             rowData[i] = values[key]
             i+=1
+        worksheet.append_row(values=rowData, value_input_option='RAW')
+
+    def appendToSuccessSheet(self, worksheet, rowDict):
+        rowData = []
+        for columnKey in self.table_headers:
+            rowData.append(rowDict[columnKey])
+        worksheet.append_row(values=rowData, value_input_option='RAW')
+
+    def appendToErrorSheet(self, worksheet, rowDict):
+        rowData = []
+        for columnKey in self.etable_headers:
+            rowData.append(rowDict[columnKey])
         worksheet.append_row(values=rowData, value_input_option='RAW')
 
     def addSuccessToSheet(self, worksheet, imageUrl, logUrl, fitsUrlList, calibrationResultList):

@@ -77,9 +77,14 @@ def createFitsFiles(name, fitsFileList):
         setPublicReadPermissions(name)
     return fitsUrlList
 
+def createImageFiles(bucket, path, image, contentType):
+    logObject = s3.Object(s3_imagebucket, path)
+    logObject.put(Body= (image), ACL='public-read', ContentType=contentType)
+    setPublicReadPermissions(path)
+
 def createErrorLog(name, data):
     url = getFileUrl('errors/'+name+'.json')
     logObject = s3.Object(s3_imagebucket, 'errors/'+name+'.json')
     logObject.put(Body=json.dumps(data))
     setPublicReadPermissions('errors/'+name+'.json')
-    return url
+    return

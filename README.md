@@ -38,3 +38,23 @@ https://pygsheets.readthedocs.io/en/latest/authorization.html
 5. save the file for later
 6. Open up the JSON file, share your spreadsheet with the "XXX-compute@developer.gserviceaccount.com" email listed.
 7. Save the JSON file wherever you're hosting your project, you'll need to load it in through Python later.
+
+# S3 bucket access
+1. download an S3 aware client application
+    a. windows: winscp(https://winscp.net/), cyberduck(https://cyberduck.io/), or filezillapro(https://filezillapro.com/)
+2. configure S3 client for access
+    a. Bucket name: Full name of the S3 bucket you are connecting to.
+    b. Access Key ID: Access Key ID with permissions for this bucket.
+    c. Secret Access Key: Secret Access Key with permissions for this bucket.
+    d. cyberduck
+        i. click '+' to add a new bookmark
+        ii. select Amazon S3 as the connection type
+        iii. name the connection
+        iv. set server to s3-us-west-2.amazonaws.com, port 443
+        v. set the access key id to 'b' above
+        vi. set the path to the bucket (astrometry-images)
+    e. winscp (https://winscp.net/eng/docs/s3)
+        i. follow instructions at https://winscp.net/eng/docs/guide_amazon_s3
+    f. filezillapro (https://filezillapro.com/)
+        i. follow instructions at https://filezillapro.com/connect-amazon-s3/
+ 

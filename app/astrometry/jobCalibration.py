@@ -1,5 +1,4 @@
 from .client import *
-from .job import Job
 
 class JobCalibration:
 
@@ -10,28 +9,18 @@ class JobCalibration:
 
     def getStatus(self):
         if self.status == None :
-            self.checkCalibrationStatus()
+            self.loadCalibrationData()
 
         return self.status
 
-    def getJob(self):
-        return Job(self.jobId)
+    # def getJob(self):
+    #     return Job(self.jobId, self)
 
-    def checkCalibrationStatus(self):
+    def loadCalibrationData(self):
         self.calibrationStatus = checkCalibrationStatus(self.jobId)
 
-        if self.calibrationStatus == None :
-            self.status = self.IN_PROGRESS
-        elif 'processing_finished' not in self.submissionStatus:
-            if 'processing_started' not in self.submissionStatus:
-                self.status = self.IN_PROGRESS
-            else:
-                self.status = self.PROCESSING_STARTED
-        else:
+        if self.calibrationStatus != None :
             self.__privateSetCalibrationDetails()
-            self.status = self.PROCESSING_FINISHED
-
-        return self.status
 
     def __privateSetCalibrationDetails(self):
         self.parity = self.calibrationStatus['parity']

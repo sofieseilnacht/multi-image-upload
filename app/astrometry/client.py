@@ -2,8 +2,11 @@ import requests
 import json
 import time
 import botocore
+import re
 
 from app.astrometry.config import *
+##import logging
+
 
 # def astrometryLogin(url, apikey):
 #     try:
@@ -31,15 +34,40 @@ def astrometryLogin():
         raise(e)
 
     return None
-
-
-def submitAstrometryUrl(imageUrl, loginSession):
+### TODO - add authentication context to the webcall, remove the proxy settings
+def astrometryWebSubmit(imageUrl, loginSession, csrfToken, invertImage):
     headers = {'User-Agent': 'Mozilla/5.0'}
-    settings = newAstromertyUploadSettings(imageUrl, loginSession)
+    settings = astromertyWebUploadSettings(imageUrl, loginSession, csrfToken, invertImage)
+    cookies = {"csrftoken" :  csrfToken}
+    # proxies = {'http' : 'http://127.0.0.1:8888',
+    #            'https': 'https://127.0.0.1:4444'}
+    try:
+        print('submitAstrometryUrl: '+imageUrl)
+        ##logging.basicConfig(level=logging.DEBUG)
+        response = requests.post(web_upload_url, cookies=cookies, headers=headers, data=settings)
+
+        if (response.status_code == 200) :
+            searchObj = re.search('<h2>\s+Submission\s+(\d+)',response.text)
+            body = searchObj.group(1)
+
+        else:
+            print("request failed: "+imageUrl+", statuscode: "+str(response.status_code))
+            body = {"url" : imageUrl, "status" : "http error", "error_code" : str(response.status_code)}
+
+    except botocore.exceptions.ClientError as e:
+        print("request failed: "+upload_url+", error_code: "+ str(e.response['Error']['Code']))
+        body = {"url" : imageUrl, "status" : "client error", "error_code" : str(e.response['Error']['Code'])}
+
+    return body
+
+def submitAstrometryUrl(imageUrl, session, invertImage):
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    settings = newAstromertyUploadSettings(imageUrl, session, invertImage)
 
     try:
         print('submitAstrometryUrl: '+imageUrl)
         response = requests.post(upload_url, headers=headers, data={'request-json': json.dumps(settings)})
+        ##response = requests.post(upload_url, headers=headers, files=json.dumps(settings))
 
         if (response.status_code == 200) :
             body = response.json()
@@ -94,9 +122,32 @@ def getUrl(headers, url):
 
     return body
 
+def getUrlAsText(headers, url):
+    try:
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == requests.codes.ok:
+            body = response.text
+        else:
+            print("request failed: "+url+", statuscode: "+str(response.status_code))
+            body = {"url" : url, "status" : "http error", "error_code" : str(response.status_code)}
+
+    #TODO - throw astrometryException
+    except requests.exceptions.RequestException as e:
+        print("request failed: "+url+", statuscode: "+str(response.status_code))
+        body = {"url" : url, "status" : "http error", "error_code" : str(e.response['Error']['Code'])}
+
+    return body
+
 def getJobCalibration2(job_id) :
     headers = {'User-Agent': 'Mozilla/5.0'}
     url = base_url+'/api/jobs/'+str(job_id)+'/calibration/'
+    result = getUrl(headers, url)
+    return result
+
+def getJobInfo(job_id) :
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    url = base_url+'/api/jobs/'+str(job_id)+'/info/'
     result = getUrl(headers, url)
     return result
 
@@ -136,6 +187,10 @@ def getJobInfo(job_id) :
     result = getUrl(headers, url)
     return result
 
+def getLogFile(url):
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    return getUrlAsText(headers, url)
+
 def getCalibrationsFitsFiles(calibration_ids) :
     fitsFiles = {}
 
@@ -172,6 +227,25 @@ def getCalibrationsFitsFile(job_id) :
     except requests.exceptions.RequestException as e:
         print("request failed: "+job_url+", statuscode: "+str(response.status_code))
         body = {"url" : job_url, "jobid" : job_id, "status" : "http error", "error_code" : str(e.response['Error']['Code'])}
+
+    return body
+
+def getCalibrationImageFile(job_url):
+
+    headers = {'User-Agent': 'Mozilla/5.0'}
+
+    try:
+        response = requests.get(job_url, headers=headers)
+
+        if response.status_code == requests.codes.ok:
+            body = response.content
+        else:
+            print("request failed: "+job_url+", statuscode: "+str(response.status_code))
+            body = {"url" : job_url, "status" : "http error", "error_code" : str(response.status_code)}
+
+    except requests.exceptions.RequestException as e:
+        print("request failed: "+job_url+", statuscode: "+str(response.status_code))
+        body = {"url" : job_url, "status" : "http error", "error_code" : str(e.response['Error']['Code'])}
 
     return body
 
@@ -322,7 +396,8 @@ def waitOnAstrometrySubmissionDone(submissionId):
 #     return body
 
 #won't work for JB image because have to split pics between invert and regular
-def newAstromertyUploadSettings(url, session):
+def newAstromertyUploadSettings(url, session, invertImage):
+
     settings = {
         # session: string, requried. Your session key, required in all requests
         "session" : session,
@@ -351,10 +426,10 @@ def newAstromertyUploadSettings(url, session):
         "scale_type" : 'ul', #bounds
 
         # scale_lower: float. The lower-bound of the scale of the image
-        "scale_lower" :'0.1',
+        "scale_lower" : 0.1,
 
         # scale_upper: float. The upper-bound of the scale of the image.
-        "scale_upper'" : '180.0',
+        "scale_upper'" : 180.0,
 
         # scale_est: float. The estimated scale of the image.
         ##settings['scale_est'] = '',
@@ -373,13 +448,13 @@ def newAstromertyUploadSettings(url, session):
         ##settings['radius'] = '',
 
         # downsample_factor: float, >1. Downsample (bin) your image by this factor before performing source
-        # detection. This often helps with saturated images, noisy images, and large images. 2 and 4 are commonlyuseful
+        # detection. This often helps with saturated images, noisy images, and large images. 2 and 4 are commonly useful
         # values.
-        "downsample_factor" : '2',
+        "downsample_factor" : 2,
 
         # tweak_order: int. Polynomial degree (order) for distortion correction. Default is 2. Higher orders may
         # produce totally bogus results (high-order polynomials are strange beasts).
-        "tweak_order" : '2',
+        "tweak_order" : 2,
 
         # use_sextractor: boolean. Use the SourceExtractor program to detect stars, not our built-in program
         ##settings['use_sextractor'] = '',
@@ -391,7 +466,7 @@ def newAstromertyUploadSettings(url, session):
         # parity: int, 0, 1 or 2. Default 2 means “try both”. 0 means that the sign of the determinant of the WCS
         # CD matrix is positive, 1 means negative. The short answer is, “try both and see which one works” if you are
         # interested in using this option. It results in searching half as many matches so can be helpful speed-wise.
-        "parity" : '2',
+        "parity" : 2,
 
         # image_width: int, only necessary if you are submitting an “x,y list” of source positions.
         ##settings['image_width'] = '',
@@ -403,8 +478,16 @@ def newAstromertyUploadSettings(url, session):
         "positional_error" : 1,
 
         # invert : 'on' or 'off' to invert image for solution
-        "invert" : 'off'
+        "invert" : invertImage
     }
 
     return settings
 
+def astromertyWebUploadSettings(imageUrl, session, csrfToken, invertImage):
+    settings = { "csrfmiddlewaretoken": csrfToken, 'file':'', "url" : imageUrl, "upload_type" : "url",
+                 "advanced_settings" : False, "publicly_visible" : "n", "allow_commercial_use" : "d", "allow_modifications" : "d",
+                 "scale_preset" : 1, "scale_units" : "degwidth", "scale_type" : 'ul', "scale_lower" : 0.1, "scale_upper'" : 180.0,
+                 "scale_est" : '', "scale_err" : '', "parity" : 2, "positional_error" : 1, "center_ra" : '',
+                 "center_dec" : '', "radius" : '', "downsample_factor" : 2, "tweak_order" : 2,
+                 "invert" : 'on' }
+    return settings
