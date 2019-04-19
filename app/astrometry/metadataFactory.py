@@ -23,7 +23,10 @@ class MetadataFactory:
         return submission
 
     def getPrintableOptions(self, url, invert):
-        settings = newAstromertyUploadSettings(url, '########', invert)
+        if invert == False:
+            settings = newAstromertyUploadSettings(url, '########', invert)
+        else:
+            settings = astromertyWebUploadSettings(url, '########', '########', invert)
         return settings
 
     def getLogFile(self, jobId, descriptor):

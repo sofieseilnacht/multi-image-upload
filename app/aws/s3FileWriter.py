@@ -22,9 +22,9 @@ class S3FileWriter:
         createImageFiles(self.bucket, path, json.dumps(data), contentType)
         self.urls[fileType] = self.getKeyUrl(path)
 
-    def getUrlByType(self, urlType):
-        if urlType['type'] in self.urls:
-            return self.urls[urlType['type']]
+    def getUrlByType(self, descriptor):
+        if descriptor['type'] in self.urls:
+            return self.urls[descriptor['type']]
         else:
             return None
 

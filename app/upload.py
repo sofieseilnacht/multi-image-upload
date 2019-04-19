@@ -38,15 +38,16 @@ def uploadImagesNew(imageBucketName, imageBucketUrl, archiveFlag):
         imageUrl = s3_bucket_url+'/'+filePath
         s3FileWriter = S3FileWriter(imageBucketName, s3_bucket_url)
 
+        ## rest API call using astrometry.net account API key
         submitOptions = metadataFactory.getPrintableOptions(imageUrl,False)
-        #submission = metadataFactory.submitImage(imageUrl,False)
-        submission = metadataFactory.webSubmitImage(imageUrl,True)
+        submission = metadataFactory.submitImage(imageUrl,False)
         jobList = submission.getSolvedJobs()
         settingsLogPrefix = 'logs/'+name+'/'+str(submission.submissionId)+'-'
 
         if len(jobList) == 0 :
-            submission = metadataFactory.webSubmitImage(imageUrl,True)
-            submitOptions = metadataFactory.getPrintableOptions(imageUrl,True)  ## TODO - this is getting the wrong set, maybe we don't need 2 sets of options
+            ## web API call as anonymous user
+            #submission = metadataFactory.webSubmitImage(imageUrl,True)
+            submitOptions = metadataFactory.getPrintableOptions(imageUrl,True)
             invertedSubmission = metadataFactory.webSubmitImage(imageUrl,True)
             jobList = invertedSubmission.getSolvedJobs()
 
@@ -79,7 +80,6 @@ def uploadImagesNew(imageBucketName, imageBucketUrl, archiveFlag):
                     s3FileWriter.write(logFilePrefix+logFilename, log, descriptor)
 
             archiveUrl = moveImage(name, imageBucketName, 'archive')
-            ## TODO: Add log files and info files to google sheet
             logger.logSuccess(name, job, archiveUrl, s3FileWriter)
         else:
             archiveUrl = moveImage(name, imageBucketName, 'error')

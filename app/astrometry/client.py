@@ -483,6 +483,7 @@ def newAstromertyUploadSettings(url, session, invertImage):
 
     return settings
 
+## publc visible y or n
 def astromertyWebUploadSettings(imageUrl, session, csrfToken, invertImage):
     settings = { "csrfmiddlewaretoken": csrfToken, 'file':'', "url" : imageUrl, "upload_type" : "url",
                  "advanced_settings" : False, "publicly_visible" : "n", "allow_commercial_use" : "d", "allow_modifications" : "d",

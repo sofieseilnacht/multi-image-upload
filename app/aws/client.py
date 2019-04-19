@@ -12,7 +12,7 @@ def listS3Files(bucketName, prefix):
     response = client.list_objects(Bucket=bucketName, Prefix=prefix)
     for content in response.get('Contents', []):
         key = content.get('Key')
-        if key.endswith( ('.jpg', '.jpeg', '.png', '.gif') ):
+        if key.endswith( ('.jpg', '.jpeg', '.png', '.gif', '.fits') ):
             yield key
 
 #Gives a list of image files in s3 Bucket

@@ -4,8 +4,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 from app.google.config import *
 
 class Client:
-    table_headers = ['id','image-url', 'ra', 'dec', 'parity', 'orientation', 'pixscale', 'radius',
-                     'image-url', 'log-url', 'wcs-fits-url', 'new-fits-url', 'rdls-fits-url', 'axy-fits-url',
+    table_headers = ['id','image-url', 'ra', 'dec', 'parity', 'orientation', 'pixscale', 'radius','job-settings', 'job-log', 'job-log2',
+                     'image-url', 'job-info', 'wcs-fits-url', 'new-fits-url', 'rdls-fits-url', 'axy-fits-url',
                      'corr-fits-url','annotated-image-url','red-green-image-url', 'extraction-image-url']
     etable_headers = ['id','image-url','log-url', 'error']
 
