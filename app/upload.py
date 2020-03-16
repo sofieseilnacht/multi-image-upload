@@ -47,9 +47,12 @@ def uploadImagesNew(imageBucketName, imageBucketUrl, archiveFlag):
         if len(jobList) == 0 :
             ## web API call as anonymous user
             #submission = metadataFactory.webSubmitImage(imageUrl,True)
+            #submitOptions = metadataFactory.getPrintableOptions(imageUrl,True)
+            #invertedSubmission = metadataFactory.webSubmitImage(imageUrl,True)
             submitOptions = metadataFactory.getPrintableOptions(imageUrl,True)
-            invertedSubmission = metadataFactory.webSubmitImage(imageUrl,True)
+            invertedSubmission = metadataFactory.submitImage(imageUrl,True)
             jobList = invertedSubmission.getSolvedJobs()
+            settingsLogPrefix = 'logs/'+name+'/'+str(invertedSubmission.submissionId)+'-'
 
         s3FileWriter.writeJson(settingsLogPrefix+'submitsettings.json',submitOptions,Job.JOB_OPTIONS)
         ## TODO - need to capture start and elapsed times
