@@ -1,8 +1,8 @@
 import time
-from progressBar import ProgressBar
+from .progressBar import *
 from .client import *
-from .job import Job
-from .jobCalibration import JobCalibration
+from .job import *
+from .jobCalibration import *
 
 
 class Submission:

@@ -1,6 +1,6 @@
-from aws.s3FileWriter import S3FileWriter
+from app.aws.s3FileWriter import S3FileWriter
 from .client import *
-from astrometry.job import Job
+from app.astrometry.job import Job
 
 class GoogleSheetLogger:
 

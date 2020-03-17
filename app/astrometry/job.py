@@ -1,6 +1,6 @@
 from .client import *
-from .jobCalibration import JobCalibration
-from progressBar import ProgressBar
+from .jobCalibration import *
+from .progressBar import *
 
 
 class Job:

@@ -1,5 +1,10 @@
 import configparser
 from app.upload import uploadImagesNew
+import os, sys
+
+cwd = os.getcwd()
+sys.path.insert(0, cwd)
+sys.path.insert(0, cwd+"/app")
 
 # read configuration and create statics
 config = configparser.ConfigParser()

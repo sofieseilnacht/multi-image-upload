@@ -1,4 +1,5 @@
 .idea/*
 *.iml
+*.ini
 google_credentials.json
 env/*
