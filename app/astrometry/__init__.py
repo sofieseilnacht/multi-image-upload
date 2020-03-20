@@ -1,8 +1,12 @@
 import configparser
+from pathlib import Path
 
 # read configuration and create statics
+home = str(Path.home())
 config = configparser.ConfigParser()
-config.read('myconfig.ini')
+config.read(home+'/.astrometry/myconfig.ini')
+config.set("google", "home_dir", home)
+
 apikey = config['nova.astrometry.net']['apikey']
 base_url = config['nova.astrometry.net']['base_url']
 login_path = config['nova.astrometry.net']['login_path']
