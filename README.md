@@ -71,8 +71,9 @@ https://pygsheets.readthedocs.io/en/latest/authorization.html
 # astrometry and google configuration files
 1. mkdir ~/Projects
 2. cd ~/Projects
-3. git pull git@github.com:sofieseilnacht/multi-image-upload.git
+3. git clone git@github.com:sofieseilnacht/multi-image-upload.git
    a. git pull if the repository is already cloned
+        i. git pull git@github.com:sofieseilnacht/multi-image-upload.git
 4. mkdir ~/.astrometry
 5. #### add secrets to config.ini and google_credentials.json - (astrometry.net api and google credentials)
 5. cp myconfig.ini ~/.astrometry
