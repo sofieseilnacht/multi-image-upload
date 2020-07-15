@@ -1,10 +1,14 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import configparser
+from pathlib import Path
 
+home = str(Path.home())
 # read configuration and create statics
 config = configparser.ConfigParser()
-config.read('myconfig.ini')
+config.read(home+'/.astrometry/myconfig.ini')
+config.set("google", "home_dir", home)
+
 json_keyfile = config['google']['credentials']
 
 # reference for scopes - https://developers.google.com/identity/protocols/googlescopes
