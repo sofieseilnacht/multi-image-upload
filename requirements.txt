@@ -1,5 +1,14 @@
-requests
+argparse
+astropy
 boto3
 botocore
+fitsio
+fs
 gspread
+ipython
+matplotlib
+numpy
 oauth2client
+python-magic
+requests
+sep
